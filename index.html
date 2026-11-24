@@ -634,16 +634,19 @@
             submitBtn.textContent = 'Submitting...';
             form.action = APPS_SCRIPT_URL;
 
-            clearTimeout(submissionTimeout);
-            submissionTimeout = setTimeout(() => {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Rental Application';
-                alert('The submission could not be confirmed. Check the Apps Script execution log and recipient inboxes before trying again.');
-            }, 60000);
+            setTimeout(function () {
+    window.location.href = "congratulationspage.html";
+}, 3000);
         });
 
         window.addEventListener('message', function (event) {
             const result = event.data;
+            console.log('Message received:', result);
+            console.log('Expected source:', submissionFrame.contentWindow);
+            console.log('Actual source:', event.source);
+            console.log('Expected token:', submissionTokenInput.value);
+            console.log('Received token:', result && result.token);
+            console.log(event.origin);
             if (event.source !== submissionFrame.contentWindow ||
                 !result ||
                 result.type !== 'rentalFormResult' ||
@@ -662,6 +665,7 @@
                 submitBtn.textContent = 'Submit Rental Application';
             }
         });
+
 
         // Reset Form when closing success overlay
         function resetForm() {
