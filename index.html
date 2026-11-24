@@ -289,14 +289,10 @@
             <p>Please complete the form below. Submission does not guarantee approval.</p>
         </div>
 
-        <!-- 
-      Email Submission Logic Placeholder:
-      Currently set to prevent default and show a UI success message.
-      To integrate with a real backend, change the action URL to your form handler (e.g. Formspree, Formkeep, custom API)
-      and replace the javascript submit logic if necessary.
-      Example: <form id="rentalForm" action="https://script.google.com/macros/s/AKfycbyPVWKH339Db1K3e6cj207kHEv1oRtOjOagk7InKsE/dev" method="POST">
-    -->
-        <form id="rentalForm" action="https://script.google.com/macros/s/AKfycbyyPQ0nn6TKOfFgfy2jB61hXFhTGnuBdHMVq1pDydStVCoAiKBg2kU0q1df8v3HbKte/exec">
+        <iframe name="submissionFrame" id="submissionFrame" title="Form submission response"
+            style="display: none;"></iframe>
+        <form id="rentalForm" method="POST" target="submissionFrame">
+            <input type="hidden" id="submissionToken" name="submissionToken">
 
             <!-- Applicant Information -->
             <h2 class="section-title">Applicant Information</h2>
@@ -616,52 +612,55 @@
             });
         }
 
-        // Handle Form Submission
+        // Replace this with the deployed Apps Script web app URL ending in /exec.
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyPQ0nn6TKOfFgfy2jB61hXFhTGnuBdHMVq1pDydStVCoAiKBg2kU0q1df8v3HbKte/exec';
         const form = document.getElementById('rentalForm');
         const submitBtn = document.getElementById('submitBtn');
         const successOverlay = document.getElementById('successOverlay');
+        const submissionFrame = document.getElementById('submissionFrame');
+        const submissionTokenInput = document.getElementById('submissionToken');
+        let submissionTimeout;
 
         form.addEventListener('submit', function (e) {
-            e.preventDefault(); // Prevent page reload
+            if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(APPS_SCRIPT_URL)) {
+                e.preventDefault();
+                alert('Set APPS_SCRIPT_URL to the deployed Google Apps Script web app URL before submitting.');
+                return;
+            }
 
-            // Disable button to prevent duplicate submissions
+            submissionTokenInput.value = Date.now().toString(36) + '-' +
+                Math.random().toString(36).slice(2);
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
+            form.action = APPS_SCRIPT_URL;
 
-            // Collect form data
-            const formData = new FormData(form);
-
-            // Submit using Fetch API native Ajax to Formspree
-            fetch(form.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
-                }
-            }).then(response => {
-                if (response.ok) {
-                    // Show Success UI
-                    successOverlay.classList.add('active');
-
-                    // Re-enable button gracefully (for when overlay is closed)
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit Rental Application';
-                } else {
-                    response.json().then(data => {
-                        if (Object.hasOwn(data, 'errors')) {
-                            alert('Oops! ' + data.errors.map(error => error.message).join(', '));
-                        } else {
-                            alert('Oops! There was a problem submitting your form');
-                        }
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Submit Rental Application';
-                    });
-                }
-            }).catch(error => {
-                alert('Oops! There was a problem submitting your form');
+            clearTimeout(submissionTimeout);
+            submissionTimeout = setTimeout(() => {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit Rental Application';
-            });
+                alert('The submission could not be confirmed. Check the Apps Script execution log and recipient inboxes before trying again.');
+            }, 60000);
+        });
+
+        window.addEventListener('message', function (event) {
+            const result = event.data;
+            if (event.source !== submissionFrame.contentWindow ||
+                !result ||
+                result.type !== 'rentalFormResult' ||
+                result.token !== submissionTokenInput.value) {
+                return;
+            }
+
+            clearTimeout(submissionTimeout);
+            if (result.ok) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Rental Application';
+                successOverlay.classList.add('active');
+            } else {
+                alert(result.message || 'The application could not be sent. Please try again later.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Rental Application';
+            }
         });
 
         // Reset Form when closing success overlay
